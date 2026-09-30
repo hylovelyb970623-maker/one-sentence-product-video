@@ -1,0 +1,244 @@
+{
+  "1": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "conditioning": [
+        "3",
+        0
+      ],
+      "model": [
+        "12",
+        0
+      ]
+    }
+  },
+  "2": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "fps": 24,
+      "bit_depth": 8,
+      "images": [
+        "6",
+        0
+      ],
+      "audio": [
+        "5",
+        0
+      ]
+    }
+  },
+  "3": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "prompt": "年轻女性：{@图1}二十岁左右，五官精致柔和，浅棕色头发挽成松散低发髻，两侧留有自然碎发，穿象牙白色方领连衣裙，短泡泡袖，领口与肩带装饰细小珍珠，妆容清淡，神情从克制沉默逐渐转为坚定释然。\n男性：只呈现画面右侧近前景的深色虚焦肩部与头部轮廓，始终背对摄影机面对女性，不展示清晰面容。\n场景：傍晚室内靠近敞开门窗的位置，女性站在画面中央，男性位于画面右侧近前景；背景是完全虚化的深绿色庭院，散布暖黄色圆形灯光光斑，空间位置与人物服装全程保持一致。\n声音：保留安静自然的同期声与极轻微庭院环境音，不使用明显背景音乐。男性以轻松随意的语气说英文台词“Hey, what's up baby?”；女性停顿后平静而坚定地回答“We're done.”，对白清晰、口型与时间同步。画面底部居中出现对应的白色英文字幕，细黑色描边，除此之外不出现文字。\n【氛围与画质】\n风格核心：写实电影短剧质感，情绪克制，通过沉默、眼神变化和简短对白表现关系决裂；人物微表情自然，不夸张表演，不出现游戏CG质感、塑料皮肤、五官漂移或僵硬口型。\n视觉基调：16:9横画幅，4K电影摄影，中长焦人像镜头，女性胸像近景，摄影机接近男性视线高度；浅景深，焦点锁定女性双眼，男性前景和庭院背景保持柔和虚化。全段为一个连续镜头，无切镜，摄影机近似固定，仅做极其缓慢的向前漂移；轻微电影颗粒，自然动态模糊。\n色彩与影调：落日从画面右后方照入，暖金色逆光勾勒女性发丝、颈部和泡泡袖轮廓；面部使用柔和琥珀色侧光，另一侧保留细腻阴影。背景以低饱和墨绿色和暖黄色散景形成冷暖对比，高光柔和不过曝，暗部保留层次，肤色自然通透。\n【画面内容】\n分镜1丨低头沉默丨0-1.2s丨连续镜头从女性胸像近景开始，女性位于画面中央，双肩放松，头部轻微低垂，双眼看向画面下方，嘴唇闭合，呼吸克制；男性深色虚焦轮廓停留在画面右侧近前景。摄影机稳定，焦点落在女性睫毛附近，金色逆光照亮松散发丝，只听见安静环境音。\n分镜2丨随意问候丨1.2-3s丨镜头保持原构图，男性以随意、略带亲昵的语气说：“Hey, what's up baby?”；女性仍然垂眼，不立即回应，只出现轻微吞咽和缓慢吸气。对白开始时，画面底部居中显示白色英文字幕“Hey what's up baby”，声音结束后字幕消失；女性不做对应口型。\n分镜3丨抬眼确认丨3-5.2s丨男性话音落下，女性停顿片刻，先抬起双眼看向画面右侧的男性，再缓慢抬高下巴，头部轻微向右转动，最终与男性建立稳定视线；眉眼从回避变为冷静坚定。摄影机以几乎不可察觉的速度向前推进，焦点从睫毛平稳转移到瞳孔，光线和人物位置保持连续。\n分镜4丨宣布结束丨5.2-7.2s丨女性保持注视男性，先短暂抿唇，随后嘴角出现极轻微、带释然意味的笑意，用平静、清楚、没有犹豫的语气说：“We're done.”；说话时只做自然的小幅度嘴部动作，下巴略微抬起。口型与台词严格同步，画面底部居中显示白色英文字幕“We're done”，男性轮廓保持静止。\n分镜5丨坚定收束丨7.2-10s丨字幕随台词结束淡出，女性继续与男性对视约一秒，保持克制而坚定的浅笑；随后笑意逐渐收起，视线缓慢移向画面下方，头部轻轻低下，但姿态不再犹豫。摄影机停止向前漂移，背景暖黄色光斑轻微摇曳，松散发丝被微弱气流带动；最后停留在女性安静垂眼、男性仍处于右侧虚焦前景的构图中。",
+      "width": 1344,
+      "ref_image_size": 768,
+      "clip": [
+        "11",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ],
+      "audio_vae": [
+        "8",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "18",
+        0
+      ],
+      "height": [
+        "22",
+        0
+      ],
+      "length": [
+        "22",
+        1
+      ]
+    }
+  },
+  "5": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+    }
+  },
+  "8": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    }
+  },
+  "9": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "24",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "21",
+        0
+      ],
+      "guider": [
+        "1",
+        0
+      ],
+      "latent_image": [
+        "3",
+        1
+      ],
+      "sampler": [
+        "25",
+        0
+      ],
+      "sigmas": [
+        "26",
+        0
+      ]
+    }
+  },
+  "11": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "12": {
+    "class_type": "LoraLoaderBypassModelOnly",
+    "inputs": {
+      "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "20",
+        0
+      ]
+    }
+  },
+  "13": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "None"
+    }
+  },
+  "14": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "4822b4b07e3b6459af19121bb1a08ae8cedf0de4f21c2a7cc65e58593a994f6b.png"
+    }
+  },
+  "16": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "13",
+        0
+      ]
+    }
+  },
+  "17": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3",
+      "format": "auto",
+      "video": [
+        "2",
+        0
+      ],
+      "codec": "auto"
+    }
+  },
+  "18": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "b46498c5bd70d5565f9b1fdfddb1a04b879c6ea8c7af96a1ff7e65329097982e.png"
+    }
+  },
+  "19": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "8eb77adc78541eb9e6d5d84595964589fe11b6d7044d2d8e685282361db5ef68.mp3"
+    }
+  },
+  "20": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "21": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 686167329919580
+    }
+  },
+  "22": {
+    "class_type": "ResolutionSelector",
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 1,
+      "multiple": 32
+    }
+  },
+  "24": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 10
+    }
+  },
+  "25": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "26": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "scheduler": "beta",
+      "steps": 8,
+      "denoise": 1.0,
+      "model": [
+        "12",
+        0
+      ]
+    }
+  }
+}
