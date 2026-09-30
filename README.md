@@ -74,6 +74,12 @@ COMFYUI_AUTH_USER=
 COMFYUI_AUTH_PASS=
 COMFYUI_WORKFLOW_DIR=./workflows
 
+# 视频生成引擎：comfyui（默认）或 h3api（MiniMax 官方 API）
+# VIDEO_ENGINE=h3api
+# H3_API_KEY=sk-xxx
+# H3_API_BASE_URL=https://api.minimaxi.com/v1
+# H3_API_MODEL=MiniMax-H3
+
 # 管理后台密码（≥16 字符；不配置则自动生成到 m0/.private/admin-password）
 # DIRECTOR_ADMIN_PASSWORD=
 # 智能体接口 Bearer Token（不配置则复用管理员密码）
@@ -81,6 +87,15 @@ COMFYUI_WORKFLOW_DIR=./workflows
 ```
 
 完整可填项见 [m0/.env.example](m0/.env.example)。
+
+### 双引擎（自部署 ComfyUI / 官方 API）
+
+生成引擎二选一，`VIDEO_ENGINE` 切换，两引擎对外接口完全一致（提交→任务 ID→轮询→下载），任务系统、质检门、剪辑链路零改动：
+
+- `comfyui`（默认）：走你自部署的 ComfyUI + MiniMax H3 Ref2VA 工作流，零边际成本，适合有 GPU 的自用/保底链路
+- `h3api`：走 MiniMax 官方 API，免 GPU 运维、天然弹性并发，适合对外放量；需配置 `H3_API_KEY`
+
+两引擎可用同一份创意脚本 A/B 对比画质与一致性后再决定默认引擎。API 字段映射集中在 `pipeline/h3_api.py` 的 `_payload()` 一处，接官方文档核对后只改这一个函数。
 
 ### 启动
 

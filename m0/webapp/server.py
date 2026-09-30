@@ -27,6 +27,7 @@ from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from PIL import Image, ImageOps
 from pipeline.comfy_client import ComfyUI, RemoteEnded, build_ref2va
+from pipeline.h3_api import H3Api
 from pipeline import render
 from pipeline import creative
 from pipeline import llm
@@ -54,6 +55,19 @@ mutex = threading.RLock()
 worker_lock = threading.Lock()
 lease = None
 ACTIVE = {'queued', 'generating', 'rendering', 'attention'}
+
+
+def _engine_name() -> str:
+    return 'h3api' if os.environ.get('VIDEO_ENGINE', 'comfyui').strip().lower() in ('h3api', 'h3_api', 'api') else 'comfyui'
+
+
+def make_engine():
+    """视频生成引擎选择：comfyui（默认，自部署 Ref2VA）或 h3api（MiniMax 官方 API）。
+
+    两引擎暴露同一组方法（submit/wait/download…），任务系统与质检门零改动；
+    通过 VIDEO_ENGINE=h3api 切换，便于同创意 A/B 对比。
+    """
+    return H3Api.from_env() if _engine_name() == 'h3api' else ComfyUI.from_env()
 
 
 def admin(credentials: HTTPBasicCredentials = Depends(security)):
@@ -367,7 +381,8 @@ def run_job(job_id):
             shot['prompt'] = creative.shot_prompt(script)
         save(job)
 
-        client = ComfyUI.from_env()
+        client = make_engine()
+        job['engine'] = _engine_name()
         client.check()
         # GPU 被其他任务占用时礼貌排队等待，而不是直接失败（单用户本地工具）
         wait_started = time.time()
@@ -594,7 +609,7 @@ def resolve(job_id: str):
         job = read_job(job_id)
         if job['stage'] != 'attention':
             raise HTTPException(409, 'Only interrupted tasks can be acknowledged')
-        client = ComfyUI.from_env()
+        client = make_engine()
         queue = client.queue()
         live = {item[1] for key in ('queue_running', 'queue_pending') for item in queue.get(key, [])}
         mine = {s.get('prompt_id') for s in job.get('shots', []) if s.get('prompt_id')}
