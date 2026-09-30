@@ -4,6 +4,7 @@ __pycache__/
 out/
 .env
 .env.*
+!.env.example
 .private/
 *.log
 .pytest_cache/
