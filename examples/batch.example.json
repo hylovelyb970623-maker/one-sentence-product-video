@@ -1,0 +1,20 @@
+{
+  "products": [
+    {
+      "id": "cup-vertical",
+      "sentence": "便携水杯，蓝色杯身，单手可开盖",
+      "price": "19.90",
+      "image": "product.png",
+      "size": "standard",
+      "orientation": "vertical"
+    },
+    {
+      "id": "cup-horizontal",
+      "sentence": "便携水杯，蓝色杯身，单手可开盖",
+      "price": "19.90",
+      "image": "product.png",
+      "size": "standard",
+      "orientation": "horizontal"
+    }
+  ]
+}

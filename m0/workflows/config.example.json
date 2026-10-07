@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "ref2va": {
+    "template": "ref2va.json",
+    "nodes": {
+      "generator": "3",
+      "product_image": "18",
+      "person_image": "28",
+      "reference_video": "13",
+      "video_components": "16",
+      "seed": "21",
+      "output": "17"
+    }
+  },
+  "fl2va": {
+    "template": "fl2va.json",
+    "nodes": {"generator": "3", "first_frame": "27", "seed": "21", "output": "17"}
+  }
+}
