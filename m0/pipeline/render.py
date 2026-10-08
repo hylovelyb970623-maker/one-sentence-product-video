@@ -116,17 +116,19 @@ def compose(raw_paths, subtitles, price, directory, width=WIDTH, height=HEIGHT):
             raise ValueError('Real shot shorter than five seconds; no freeze or mock padding allowed')
         overlay(directory / f'overlay_{i}.png', text, price if i == 1 else None, width, height)
         run(['-i', raw, '-loop', '1', '-i', directory / f'overlay_{i}.png',
-             '-filter_complex', f'[0:v]fps=24,trim=end_frame=120,setpts=PTS-STARTPTS,scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1[v];[v][1:v]overlay=0:0:shortest=1[out]',
-             '-map', '[out]', '-an', '-frames:v', '120', '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p', directory / f'part_{i}.mp4'])
+             '-filter_complex', f'[0:v]fps=24,trim=end_frame=120,setpts=PTS-STARTPTS,scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1[v];[v][1:v]overlay=0:0:shortest=1,settb=1/24,setpts=N[out]',
+             '-map', '[out]', '-an', '-r', '24', '-fps_mode', 'cfr', '-frames:v', '120', '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p', directory / f'part_{i}.mp4'])
     music(directory / 'original_bgm.wav')
     temporary = directory / 'final.pending.mp4'
     run(['-i', directory / 'part_0.mp4', '-i', directory / 'part_1.mp4', '-i', directory / 'original_bgm.wav',
-         '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', '-map', '2:a:0',
-         '-t', '10', '-r', '24', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac',
+         '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0,settb=1/24,setpts=N[v]', '-map', '[v]', '-map', '2:a:0',
+         '-t', '10', '-r', '24', '-fps_mode', 'cfr', '-frames:v', '240', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac',
          '-movflags', '+faststart+use_metadata_tags', '-metadata', 'ai_generated=true',
          '-metadata', 'comment=AI-generated visuals; original procedural music; not regulatory certification', temporary])
-    if frame_count(temporary) != 240:
-        raise RuntimeError('Final duration validation failed')
+    final_frames = frame_count(temporary)
+    if final_frames != 240:
+        part_frames = [frame_count(directory / f'part_{index}.mp4') for index in range(2)]
+        raise RuntimeError(f'Final duration validation failed: expected 240 frames, got {final_frames}; shots={part_frames}')
     final = directory / 'final.mp4'
     temporary.replace(final)
     return str(final)

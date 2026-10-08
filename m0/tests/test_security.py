@@ -19,6 +19,17 @@ def test_scanner_does_not_echo_secret_values():
     assert sensitive not in repr(findings)
 
 
+@pytest.mark.parametrize('email,is_public_service', [
+    ('noreply@github.com', True),
+    ('support@github.com', True),
+    ('person@' + 'github.com', False),
+])
+def test_scanner_allows_only_exact_github_service_addresses(email, is_public_service):
+    findings = scan_bytes('commit.txt', email.encode())
+    assert bool(findings) == (not is_public_service)
+    assert all(item.rule == 'personal_email' for item in findings)
+
+
 def test_release_blocks_secrets_private_files_and_symlinks(tmp_path):
     (tmp_path / 'release-manifest.json').write_text(json.dumps(['main.py', '.env', 'link.py']))
     sensitive = secrets.token_urlsafe(32)

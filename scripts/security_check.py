@@ -63,7 +63,8 @@ def local_secrets(root):
 
 def allowed_match(rule, value):
     if rule == 'personal_email':
-        return value.endswith(('@example.com', '@example.org', '@example.test', '@users.noreply.github.com'))
+        return (value in {'noreply@github.com', 'support@github.com'}
+                or value.endswith(('@example.com', '@example.org', '@example.test', '@users.noreply.github.com')))
     if rule == 'network_address':
         try:
             address = ipaddress.ip_address(value)

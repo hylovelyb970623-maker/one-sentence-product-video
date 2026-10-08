@@ -40,7 +40,7 @@ chmod 600 m0/.env
 
 可选 `VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY` 用于看图和质检。云端文本服务会收到商品事实；云端视觉服务还会收到商品图与质检抽帧；素材会发到配置的 ComfyUI。**本地网页不等于所有数据都留在本机。**
 
-Linux 安装中文字体（例如 `fonts-noto-cjk`），或指定 `CHINESE_FONT`。FFmpeg 优先系统程序，否则使用 `imageio-ffmpeg` 随包提供的二进制。
+Linux 安装中文字体（例如 `fonts-noto-cjk`），或指定 `CHINESE_FONT`。FFmpeg 需要 5.1+，优先系统程序，否则使用 `imageio-ffmpeg` 随包提供的二进制；合成显式固定为每镜 120 帧、成片 240 帧和 24 fps。
 
 ```bash
 m0/.venv/bin/python m0/doctor.py

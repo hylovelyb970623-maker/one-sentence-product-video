@@ -124,6 +124,19 @@ def test_real_render(raw_media, tmp_path):
     assert len(set(a.crop((20,590,410,710)).getdata()))>20
 
 
+def test_real_render_mixed_frame_rates(tmp_path):
+    raw_paths = []
+    for index, frame_rate in enumerate((25, 30)):
+        raw_path = tmp_path / f'raw_{index}.mp4'
+        render.run(['-f', 'lavfi', '-i', f'color=c=blue:s=432x768:r={frame_rate}',
+                    '-t', '5.2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', raw_path])
+        raw_paths.append(raw_path)
+    output = render.compose(raw_paths, ['商品展示', '查看商品详情'], None, tmp_path)
+    assert [render.frame_count(tmp_path / f'part_{index}.mp4') for index in range(2)] == [120, 120]
+    assert render.frame_count(output) == 240
+    assert '00:00:10.00' in render.run(['-i', output, '-f', 'null', '-']).stderr
+
+
 def test_short_video_rejected(tmp_path):
     raw=tmp_path/'short.mp4'
     render.run(['-f','lavfi','-i','color=s=64x64:r=24','-t','1','-c:v','libx264',raw])
