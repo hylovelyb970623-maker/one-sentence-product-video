@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
-from pipeline.config import load_env
+from pipeline.config import load_env, video_engine
 load_env()
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -60,15 +60,11 @@ ACTIVE = {'planning', 'queued', 'generating', 'rendering', 'attention'}
 
 
 def _engine_name() -> str:
-    return 'h3api' if os.environ.get('VIDEO_ENGINE', 'comfyui').strip().lower() in ('h3api', 'h3_api', 'api') else 'comfyui'
+    return video_engine()
 
 
 def make_engine(name=None):
-    """视频生成引擎选择：comfyui（默认，自部署 Ref2VA）或 h3api（MiniMax 官方 API）。
-
-    两引擎暴露同一组方法（submit/wait/download…），任务系统与质检门零改动；
-    通过 VIDEO_ENGINE=h3api 切换，便于同创意 A/B 对比。
-    """
+    """Official MiniMax API by default; explicit comfyui preserves local generation."""
     selected = name or _engine_name()
     if selected not in {'h3api', 'comfyui'}:
         raise RuntimeError('Unsupported persisted video engine')
@@ -423,25 +419,32 @@ def run_job(job_id):
         prev_video_name = None  # 镜 0 成片 → 镜 1 的参考视频（人物/服饰/场景/商品状态镜像）
         for shot, script in zip(job['shots'], job['creative']['shots']):
             entry_late = bool(script.get('product_entry')) and script['product_entry'] != '全程'
-            for attempt in (1, 2):  # 质检不过自动换种子重试一次
+            for attempt in (1, 2):
                 shot['status'] = 'submitting'
+                shot['prompt_id'] = None
                 job.update(stage='generating', progress=10 + shot['index'] * 35,
                            message='正在制作视频，请稍候' if attempt == 1 else '商品出现过早，正在自动重拍这一镜')
                 save(job)
-                if shot['index'] == 0:
+                if shot['index'] != 0:
+                    shot['prompt'] = creative.shot_prompt(script, continuation=True)
+                if job['engine'] == 'h3api':
+                    workflow = client.build_request(shot['prompt'], reference,
+                                                    persona=persona_name if shot['index'] == 0 else None,
+                                                    video=prev_video_name if shot['index'] != 0 else None,
+                                                    ratio='9:16' if job['orientation'] == 'vertical' else '16:9')
+                elif shot['index'] == 0:
                     workflow = build_ref2va(shot['prompt'], reference,
                                             width=job['gen_width'], height=job['gen_height'],
                                             length=124, ref_image_size='match',
                                             ref_person_image_name=persona_name)
                 else:
                     # 衔接镜：商品参考图锁外观颜色 + 上一镜成片作参考视频镜像人物/场景
-                    continuity_prompt = creative.shot_prompt(script, continuation=True)
-                    shot['prompt'] = continuity_prompt
-                    workflow = build_ref2va(continuity_prompt, reference,
+                    workflow = build_ref2va(shot['prompt'], reference,
                                             width=job['gen_width'], height=job['gen_height'],
                                             length=124, ref_image_size='match',
                                             ref_video_file=prev_video_name)
-                output_prefix(workflow, f'director/{job_id}/shot_{shot["index"]}')
+                if job['engine'] == 'comfyui':
+                    output_prefix(workflow, f'director/{job_id}/shot_{shot["index"]}')
                 remote_uncertain = True
                 shot['prompt_id'] = client.submit(workflow)
                 shot['status'] = 'running'
@@ -484,7 +487,7 @@ def run_job(job_id):
                 # 不把递入动作喂给下一镜（否则镜 2 会把递咖啡再演一遍）
                 continuity_ref = directory / 'continuity_ref.mp4'
                 render.run(['-sseof', '-2.2', '-i', shot['video'], '-an',
-                            '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', continuity_ref])
+                            '-r', '24', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', continuity_ref])
                 prev_video_name = client.upload_image(continuity_ref, name=f'{job_id}_prev.mp4')
                 shot['continuity'] = '下一镜以本镜收尾 2 秒为参考视频 + 商品参考图双锁定（递入动作不进入参考）'
             save(job)
@@ -504,7 +507,8 @@ def run_job(job_id):
     except RemoteEnded as error:
         # 远端已明确结束（报错/被中断）：不是不确定态，直接允许重试
         job.update(stage='error',
-                   message='这一镜在 GPU 上被中断或报错，未生成视频。请稍后重新提交',
+                   message=('视频引擎已明确拒绝、失败或取消本次生成。请核对配置、余额与输入后重新提交'
+                            if job.get('engine') == 'h3api' else '这一镜在 GPU 上被中断或报错，未生成视频。请稍后重新提交'),
                    diagnostic=str(error)[:2000])
     except Exception as error:
         detail = str(error)
@@ -663,7 +667,7 @@ def resolve(job_id: str):
         if engine == 'h3api':
             if not mine or any(shot.get('status') == 'submitting' and not shot.get('prompt_id') for shot in job.get('shots', [])):
                 raise HTTPException(409, 'Unknown API submission identity; inspect the provider before clearing this task manually')
-            terminal = {'success', 'succeed', 'completed', 'fail', 'failed', 'error'}
+            terminal = {'succeeded', 'failed', 'cancelled'}
             if any(client.task_status(prompt_id) not in terminal for prompt_id in mine):
                 raise HTTPException(409, 'API task still active or status unknown; nothing was stopped')
         else:

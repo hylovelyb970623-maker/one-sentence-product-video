@@ -8,7 +8,9 @@ from test_production import api
 from webapp import server
 
 
-def test_download_session_never_receives_provider_key(monkeypatch):
+@pytest.mark.parametrize('host,configured', [('cdn.example.test', True), ('video-product.cdn.minimax.io', False),
+                                          ('cdn.hailuoai.com', False), ('filecdn.minimax.chat', False)])
+def test_download_session_never_receives_provider_key(monkeypatch, host, configured):
     calls = []
 
     class Session:
@@ -30,11 +32,11 @@ def test_download_session_never_receives_provider_key(monkeypatch):
             return response
 
     monkeypatch.setattr(requests, 'Session', Session)
-    monkeypatch.setenv('H3_API_DOWNLOAD_HOSTS', 'cdn.example.test')
+    monkeypatch.setenv('H3_API_DOWNLOAD_HOSTS', host if configured else '')
     credential = secrets.token_urlsafe(32)
     client = H3Api(credential, 'https://api.example.test/v1', 'configured-model')
     client._request('GET', '/status')
-    client._request('GET', 'https://cdn.example.test/video.mp4', absolute=True)
+    client._request('GET', f'https://{host}/video.mp4', absolute=True)
     assert calls[0][1]['Authorization'] == 'Bearer ' + credential
     assert 'Authorization' not in calls[1][1]
     assert all(not entry[2] and entry[3]['allow_redirects'] is False for entry in calls)
@@ -86,7 +88,8 @@ def test_api_only_reads_registered_assets(tmp_path):
         client.queue()
 
 
-def test_recovery_uses_recorded_engine_and_checks_task_status(api, monkeypatch):
+@pytest.mark.parametrize('terminal', ['succeeded', 'failed', 'cancelled'])
+def test_recovery_uses_recorded_engine_and_checks_task_status(api, monkeypatch, terminal):
     job_id = '7' * 32
     server.job_path(job_id).mkdir()
     server.save({'job_id': job_id, 'created_at': 1, 'stage': 'attention', 'engine': 'h3api',
@@ -103,7 +106,7 @@ def test_recovery_uses_recorded_engine_and_checks_task_status(api, monkeypatch):
     endpoint = f'/api/admin/jobs/{job_id}/resolve'
     assert api.post(endpoint, auth=('admin', server.ADMIN_PASSWORD)).status_code == 409
     assert server.read_job(job_id)['stage'] == 'attention'
-    remote_state['status'] = 'success'
+    remote_state['status'] = terminal
     assert api.post(endpoint, auth=('admin', server.ADMIN_PASSWORD)).status_code == 200
 
 

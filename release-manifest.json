@@ -9,6 +9,7 @@
   "THIRD_PARTY.md",
   "release-manifest.json",
   "docs/automation.md",
+  "docs/minimax-api.md",
   "docs/open-source-roadmap.md",
   "examples/batch.example.json",
   "scripts/security_check.py",
@@ -52,5 +53,6 @@
   "m0/tests/test_open_source.py",
   "m0/tests/test_security.py",
   "m0/tests/test_h3_security.py",
+  "m0/tests/test_minimax_v2.py",
   "m0/启动界面.command"
 ]

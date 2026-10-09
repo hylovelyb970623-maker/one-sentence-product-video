@@ -5,7 +5,7 @@ import os
 import sys
 from urllib.parse import urlparse
 
-from pipeline.config import load_env
+from pipeline.config import load_env, video_engine
 
 
 def check(online=False):
@@ -23,14 +23,35 @@ def check(online=False):
     except Exception:
         record('render', False, 'Install dependencies and a CJK font; optionally set FFMPEG_BINARY / CHINESE_FONT')
     workflow = None
+    engine = None
     try:
-        from pipeline.comfy_client import build_ref2va
-        from pipeline.workflows import output_prefix
-        workflow = build_ref2va('preflight only', 'product.png', ref_person_image_name='person.png', ref_video_file='continuity.mp4')
-        output_prefix(workflow, 'director/preflight')
-        record('workflow', True, 'Ref2VA API template and node mapping load successfully')
+        engine = video_engine()
+        record('engine', True, engine)
     except Exception:
-        record('workflow', False, 'Check API JSON and DIRECTOR_WORKFLOW_CONFIG node mapping')
+        record('engine', False, 'Set VIDEO_ENGINE=h3api or comfyui')
+    if engine == 'h3api':
+        try:
+            from pipeline.h3_api import H3Api
+            client = H3Api.from_env()
+            try:
+                client.check()
+                record('minimax_config', True, 'Official V2 configuration valid; credentials, balance and live generation are not verified')
+            finally:
+                client.session.close()
+        except Exception:
+            record('minimax_config', False, 'Configure your MiniMax API key, supported H3 model/resolution and HTTPS base URL')
+        if online:
+            results.append({'check': 'minimax_online', 'status': 'optional',
+                            'detail': 'No paid submission or undocumented authentication probe is performed; verify access privately on the platform'})
+    elif engine == 'comfyui':
+        try:
+            from pipeline.comfy_client import build_ref2va
+            from pipeline.workflows import output_prefix
+            workflow = build_ref2va('preflight only', 'product.png', ref_person_image_name='person.png', ref_video_file='continuity.mp4')
+            output_prefix(workflow, 'director/preflight')
+            record('workflow', True, 'Ref2VA API template and node mapping load successfully')
+        except Exception:
+            record('workflow', False, 'Check API JSON and DIRECTOR_WORKFLOW_CONFIG node mapping')
     base = os.environ.get('LLM_BASE_URL') or os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
     local = urlparse(base).hostname in {'localhost', '127.0.0.1', '::1'}
     ready = bool(os.environ.get('LLM_API_KEY') or os.environ.get('DEEPSEEK_API_KEY') or (local and os.environ.get('LLM_MODEL')))
@@ -69,7 +90,7 @@ def check(online=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--online', action='store_true', help='Read ComfyUI stats, node/model names and queue')
+    parser.add_argument('--online', action='store_true', help='Read ComfyUI metadata in local mode; API mode never submits a paid authentication probe')
     args = parser.parse_args()
     result = check(args.online)
     print(json.dumps(result, ensure_ascii=False, indent=2))

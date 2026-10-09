@@ -1,31 +1,34 @@
 # 一句话生成带货视频 · AI Director
 
-**把自己的 ComfyUI 视频工作流变成可复用的商品视频生产工具。** 上传商品图、填写真实介绍，生成两镜头、10 秒 MP4，自动配中文字幕、可选价格、原创程序配乐与 AI 标识。
+**一句商品介绍 + 商品图，通过 MiniMax 官方 API 生成带货视频，无需部署视频模型或 ComfyUI。** 生成两镜头、10 秒 MP4，自动配中文字幕、可选价格、原创程序配乐与 AI 标识；也保留自有 ComfyUI 模式。
 
-支持本地网页、智能体 HTTP 接口和串行商品批量任务。视频计算由你配置的 ComfyUI / MiniMax H3 工作流执行；文本编导可接 DeepSeek 或其他 OpenAI 兼容服务，包括本地服务。本项目不提供模型权重、共享 GPU 或公共在线生成服务。
+支持本地网页、智能体 HTTP 接口和串行商品批量任务。默认视频计算使用你自己的 MiniMax H3 / H3 Max 官方 V2 API；文本编导可接 DeepSeek 或其他 OpenAI 兼容服务，包括本地服务。本项目不提供 API 额度、模型权重或公共在线生成服务。网页与 FFmpeg 合成仍在本机运行；「不部署模型」不等于托管网站。
 
 ## 已实现
 
 - **完整成片**：商品参考图、可选的已授权人物照、两镜脚本、参考上一镜收尾片段、抽帧检查与 FFmpeg 合成。
+- **云端优先、双引擎**：官方 V2 的多模态参考请求、异步任务查询、无 Key CDN 下载；云端模式不读取 ComfyUI 工作流、不连接 GPU / SSH。已有本地模式可继续使用。
 - **横竖版与两档尺寸**：432×768 / 720×1280，以及对应横版；10 秒、24fps。耗时取决于模型、显存、负载与重拍，页面时间仅供参考。
 - **可配置工作流**：替换 ComfyUI API JSON，用节点角色映射适配不同编号。保留 H3 输入契约，不宣称兼容所有视频模型。
 - **自动化与批量**：独立 Bearer 令牌、幂等提交、受保护的状态与下载接口、逐个制作、断点恢复、下载校验。
-- **安装自检**：检查 Python、FFmpeg、中文字体、工作流；可选只读探测 ComfyUI 节点、模型选择器和队列，不生成视频、不调用 LLM。
+- **安装自检**：按引擎检查 API 配置或本地工作流；可选只读探测 ComfyUI 节点、模型选择器和队列，不生成视频、不调用 LLM，也不验证云端额度。
 - **安全发布**：配置模板、源码白名单打包、密钥与个人信息扫描、Git 历史检查、CI 测试与依赖审计。
 
 ```mermaid
 flowchart LR
   Input[商品图与真实介绍] --> Entry[网页 / 智能体 / 批量清单]
   Entry --> Plan[文本编导与可选视觉识别]
-  Plan --> Queue[持久化任务与 GPU 互斥]
-  Queue --> Comfy[自己的 ComfyUI / H3]
-  Comfy --> Render[抽帧检查与 FFmpeg 合成]
+  Plan --> Queue[持久化任务与串行执行]
+  Queue --> API[MiniMax 官方 API 默认]
+  Queue --> Comfy[自己的 ComfyUI 可选]
+  API --> Render[抽帧检查与 FFmpeg 合成]
+  Comfy --> Render
   Render --> Video[10 秒成片]
 ```
 
 ## 快速开始
 
-支持 macOS、Linux；Windows 使用 WSL2。需要 Python 3.11+、可用的 H3 Ref2VA ComfyUI 服务及文本编导模型。视觉模型可选：未配置时不进行图像识别和有效视觉质检。
+支持 macOS、Linux；Windows 使用 WSL2。需要 Python 3.11+、有余额且已开通相应模型的 MiniMax API 账户及文本编导模型；无需本地 GPU。视觉模型可选：未配置时不进行图像识别和有效视觉质检。
 
 ```bash
 git clone https://github.com/hylovelyb970623-maker/one-sentence-product-video.git
@@ -36,9 +39,11 @@ cp m0/.env.example m0/.env
 chmod 600 m0/.env
 ```
 
-只在本机编辑 `m0/.env`。默认 ComfyUI 为 `http://127.0.0.1:8188`；填写 `DEEPSEEK_API_KEY`，或配置 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY` 接入其他文本服务。本地免认证兼容服务可留空 Key，模型需支持 JSON 对象响应，模型 ID 以服务提供方为准。
+只在本机编辑 `m0/.env`。新安装默认 `VIDEO_ENGINE=h3api`，填写自己的 `H3_API_KEY`（或 `MINIMAX_API_KEY`，前者优先），保留 `H3_API_MODEL=MiniMax-H3`、`H3_API_RESOLUTION=768P` 与 `H3_API_BASE_URL=https://api.minimax.cn`。MiniMax Key 不是 GitHub Token，**不要发到聊天、写进源码或提交 GitHub**。
 
-可选 `VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY` 用于看图和质检。云端文本服务会收到商品事实；云端视觉服务还会收到商品图与质检抽帧；素材会发到配置的 ComfyUI。**本地网页不等于所有数据都留在本机。**
+编导另填 `DEEPSEEK_API_KEY`，或配置 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY` 接入其他文本服务。本地免认证兼容服务可留空 Key，模型需支持 JSON 对象响应，模型 ID 以服务提供方为准。视频 API Key 不会自动作为文本/视觉模型 Key 使用。
+
+可选 `VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY` 用于看图和质检。云端文本服务会收到商品事实；云端视觉服务还会收到商品图与质检抽帧；视频 API 会收到提示词、商品图、可选人物照与上一镜收尾视频。本地模式则把素材发到配置的 ComfyUI。**本地网页不等于所有数据都留在本机。**
 
 Linux 安装中文字体（例如 `fonts-noto-cjk`），或指定 `CHINESE_FONT`。FFmpeg 需要 5.1+，优先系统程序，否则使用 `imageio-ffmpeg` 随包提供的二进制；合成显式固定为每镜 120 帧、成片 240 帧和 24 fps。
 
@@ -52,15 +57,19 @@ bash scripts/start.sh
 
 ## 接入自己的 ComfyUI
 
+已有用户的私密 `.env` 不会被覆盖；要继续本地生成，显式保留或添加 `VIDEO_ENGINE=comfyui`。历史任务未记录引擎时仍按 ComfyUI 恢复，不自动切换或重新收费。新默认仅影响没有显式配置的新任务。
+
 先在自己的 ComfyUI 验证工作流，再导出 **API 格式** JSON 并设置节点映射，见 [工作流接入](m0/workflows/README.md)。自检不等于真实 GPU 生成验收。
 
 远程服务推荐 SSH 隧道：清空 `COMFYUI_HOST`，配置 `SSH_HOST`、`SSH_USER` 和密钥。SSH 只接受可信 known_hosts，首次连接需自行核实主机指纹。远程直连应使用可信 HTTPS，不在明文公网 HTTP 上传认证信息与素材。
 
-## 可选视频 API 适配
+## MiniMax 官方 API
 
-保留后续提交新增的 `VIDEO_ENGINE=h3api` 实验适配路径，默认仍为 ComfyUI。选择 API 路径时，填写自己的 `H3_API_KEY`、`H3_API_MODEL` 和服务路径；请求字段与具体模型支持情况需要对照提供方文档验证，本项目的 mock 测试不代表该云端模型已验证可用。
+已按官方文档接入 `POST /v2/video_generation` 和 `GET /v2/query/video_generation/{task_id}`，使用 `content` 中的 `reference_image` / `reference_video`。默认两镜各 5 秒，`9:16` / `16:9`。`MiniMax-H3` 支持 `768P` / `2K`；`MiniMax-H3-Max` 支持 `480P` / `768P`，不支持 `2K`。页面的标准/高清是本地合成尺寸，API 分辨率由 `H3_API_RESOLUTION` 独立决定。
 
-API 调用只接受 HTTPS。下载视频使用无认证信息的独立连接，不向 CDN 发送模型 Key；跨主机下载须将核实过的域名加入 `H3_API_DOWNLOAD_HOSTS`，多个域名用逗号分隔。不接受下载重定向、未知主机或不安全的任务文件名。
+API 按平台规则计费；基础两次生成，质检最多每镜再拍一次，可能产生额外费用。旧版实验路径配置 `H3_API_SUBMIT_PATH` / `H3_API_QUERY_PATH` / `H3_API_FILES_PATH` 已移除，请更新旧 base URL。素材尺寸与请求大小在提交前校验，图片清除元数据并等比缩放/补边，不裁掉商品。
+
+API 调用只接受 HTTPS。下载使用无认证信息的独立连接，默认允许官方文档中的三个精确 CDN 主机；新增域名必须自行核实后加入 `H3_API_DOWNLOAD_HOSTS`（逗号分隔），不接受重定向、未知主机或不安全任务文件名。配置检查和 mock 测试**不代表真实云端生成已经验收**；详见 [API 配置、费用与恢复](docs/minimax-api.md)。
 
 任务保存其实际引擎，恢复时逐个检查对应平台的任务状态。API 提交结果不明且没有任务 ID 时，不能把平台“无全局队列接口”当作空闲，必须先人工核实；不会自动再次消费生成额度。
 

@@ -396,92 +396,130 @@ def test_caption_note_director_rule_present():
     assert '禁止】写"字幕：' in creative.DIRECTOR_SYSTEM
 
 
-def test_h3_api_payload_and_flow(tmp_path, monkeypatch):
-    """H3 API 引擎：Ref2VA 工作流正确翻译为官方请求体；轮询/失败/下载语义正确。"""
-    from pipeline.comfy_client import RemoteEnded, build_ref2va
+def test_h3_api_payload_and_flow(tmp_path, monkeypatch, raw_media):
+    from pipeline.comfy_client import RemoteEnded
     from pipeline.h3_api import H3Api
     monkeypatch.setenv('H3_API_KEY', 'sk-test-h3')
     client = H3Api.from_env()
-    # 注册三类素材（与 server.run_job 的上传次序一致）
-    product = tmp_path / 'product.png'; product.write_bytes(picture())
-    persona = tmp_path / 'persona.png'; persona.write_bytes(picture())
-    prev = tmp_path / 'prev.mp4'; prev.write_bytes(b'fake-mp4-bytes')
-    assert client.upload_image(str(product), name='job.png') == 'job.png'
-    client.upload_image(str(persona), name='job_person.png')
-    client.upload_image(str(prev), name='job_prev.mp4')
-    wf = build_ref2va('提示词 <Picture 1> 商品 <Picture 2> 人物', 'job.png',
-                      ref_person_image_name='job_person.png', ref_video_file='job_prev.mp4')
+    product = tmp_path / 'product.png'
+    product.write_bytes(picture())
+    persona = tmp_path / 'persona.png'
+    persona.write_bytes(picture())
+    client.upload_image(product, name='job.png')
+    client.upload_image(persona, name='job_person.png')
+    client.upload_image(raw_media[0], name='job_prev.mp4')
+    payload = client.build_request('提示词 <Picture 1> 商品 <Picture 2> 人物', 'job.png',
+                                   persona='job_person.png', video='job_prev.mp4')
+    assert set(payload) == {'model', 'content', 'duration', 'resolution', 'ratio'}
+    assert payload['duration'] == 5 and payload['ratio'] == '9:16'
+    assert payload['resolution'] == '768P' and payload['model'] == 'MiniMax-H3'
+    assert [item['type'] for item in payload['content']] == ['text', 'image_url', 'image_url', 'video_url']
+    assert [item['role'] for item in payload['content'][1:]] == ['reference_image', 'reference_image', 'reference_video']
+    image_bytes = base64.b64decode(payload['content'][1]['image_url']['url'].split(',')[1])
+    with Image.open(io.BytesIO(image_bytes)) as image:
+        assert image.size == (256, 256) and not image.info
+    assert len(client.build_request('商品', 'job.png')['content']) == 2
     calls = []
-    class Resp:
-        def __init__(self, status=200, body=None, content=b''):
-            self.status_code, self._body, self.content = status, body, content
-        def json(self): return self._body
-        def raise_for_status(self):
-            if self.status_code >= 400: raise RuntimeError(f'http {self.status_code}')
-        @property
-        def text(self): return str(self._body)
-    polls = [{'status': 'queueing'}, {'status': 'generating'}, {'status': 'success', 'download_url': 'https://dl/h3.mp4'}]
-    def fake_request(method, path, absolute=False, timeout=60, json=None, params=None):
-        calls.append((method, path, json, params, absolute))
+    statuses = iter(['queued', 'running', 'succeeded'])
+
+    def response(body=None, content=b'', status=200):
+        import requests
+        result = requests.Response()
+        result.status_code = status
+        result._content = json.dumps(body).encode() if body is not None else content
+        return result
+
+    def fake_request(method, path, **kwargs):
+        calls.append((method, path, kwargs))
         if method == 'POST':
-            assert path == '/video_generation' and not absolute
-            return Resp(body={'task_id': 'task-1'})
-        if not absolute:
-            return Resp(body=polls.pop(0))
-        return Resp(content=b'PNGDATA-not-used' + b'x' * 32)
-    monkeypatch.setattr(H3Api, '_request', lambda self, *a, **k: fake_request(*a, **k))
-    task = client.submit(wf)
-    assert task == 'task-1'
-    payload = calls[0][2]
-    assert payload['prompt'].startswith('提示词 <Picture 1>')
-    assert payload['duration'] == 5 and payload['width'] and payload['height']
-    assert payload['seed'] == wf['21']['inputs']['noise_seed']
-    assert len(payload['prompt_tags']['images']) == 2          # 商品图 + 人物照
-    assert payload['prompt_tags']['images'][0].startswith('data:image/png;base64,')
-    assert len(payload['prompt_tags']['videos']) == 1          # 上一镜收尾参考视频
-    # 只有商品图（无人物照/参考视频）时：参考列表不携带空项或模板占位
-    wf_plain = build_ref2va('只有商品图 <Picture 1>', 'job.png')
-    payload_plain = client._payload(wf_plain)
-    assert len(payload_plain['prompt_tags']['images']) == 1 and payload_plain['prompt_tags']['videos'] == []
+            assert path == '/v2/video_generation' and kwargs['json'] == payload
+            return response({'task_id': 'task-1'})
+        if kwargs.get('absolute'):
+            return response(content=b'mocked-video')
+        assert path == '/v2/query/video_generation/task-1' and 'params' not in kwargs
+        return response({'task': {'id': 'task-1', 'status': next(statuses),
+                                  'task_type': 'generation', 'modality': 'video',
+                                  'content': {'url': 'https://cdn.hailuoai.com/h3.mp4'}}})
+
+    monkeypatch.setattr(client, '_request', fake_request)
+    task = client.submit(payload)
     entry = client.wait(task, timeout_s=10, poll_s=0)
-    assert entry['download_url'] == 'https://dl/h3.mp4'
+    assert entry == {'task_id': 'task-1', 'download_url': 'https://cdn.hailuoai.com/h3.mp4'}
     saved = client.download_outputs(entry, str(tmp_path / 'raw'))
-    assert len(saved) == 1 and saved[0].endswith('h3_task-1.mp4')   # 固定安全命名
-    assert (tmp_path / 'raw' / 'h3_task-1.mp4').read_bytes().startswith(b'PNGDATA')
-    # 失败状态 → RemoteEnded（明确结束，可重试，不进不确定态）
-    monkeypatch.setattr(H3Api, '_request', lambda self, *a, **k: Resp(body={'status': 'fail', 'message': 'content filtered'}))
+    assert len(saved) == 1 and Path(saved[0]).name == 'h3_task-1.mp4'
+    assert Path(saved[0]).read_bytes() == b'mocked-video'
+    assert len(calls) == 5
+    monkeypatch.setattr(client, '_request', lambda *args, **kwargs: response(
+        {'task': {'id': task, 'status': 'failed', 'error': {'code': '1026', 'message': 'content filtered'}}}))
     with pytest.raises(RemoteEnded):
         client.wait(task, timeout_s=10, poll_s=0)
-    # 未配置 Key → 明确报错
     monkeypatch.delenv('H3_API_KEY')
     with pytest.raises(RuntimeError, match='H3_API_KEY'):
         H3Api.from_env()
 
 
-def test_engine_selection_h3api(api, monkeypatch, raw_media):
-    """VIDEO_ENGINE=h3api 时任务走官方 API 引擎，且不触碰 ComfyUI。"""
-    finished=threading.Event(); submitted=[]
-    class FakeH3:
-        def check(self): return {'engine': 'h3api'}
-        def queue_size(self): return 0
-        def upload_image(self,*args,**kwargs): return 'ref.png'
-        def submit(self,wf):
-            submitted.append(wf); return f'task-{len(submitted)}'
-        def wait(self,prompt_id,**kwargs): return {}
-        def download_outputs(self,entry,directory): return [raw_media[len(submitted)-1]]
-    def comfy_should_not_run():
-        raise AssertionError('VIDEO_ENGINE=h3api 时不应调用 ComfyUI')
-    monkeypatch.setenv('VIDEO_ENGINE','h3api')
-    monkeypatch.setattr(server.H3Api,'from_env',lambda: FakeH3())
-    monkeypatch.setattr(server.ComfyUI,'from_env', comfy_should_not_run)
-    original=server.release
-    def release(): original();finished.set()
-    monkeypatch.setattr(server,'release',release)
-    r=submit(api);assert r.status_code==202
+@pytest.mark.parametrize('orientation,persona,model', [
+    ('vertical', True, 'MiniMax-H3'),
+    ('horizontal', False, 'MiniMax-H3-Max'),
+])
+def test_engine_selection_h3api(api, monkeypatch, raw_media, orientation, persona, model):
+    import requests
+    from pipeline.h3_api import H3Api
+    finished = threading.Event()
+    submitted = []
+    client = H3Api('sk-test-h3', 'https://api.minimax.cn', model)
+
+    def fake_request(method, path, **kwargs):
+        result = requests.Response()
+        result.status_code = 200
+        if method == 'POST':
+            submitted.append(kwargs['json'])
+            result._content = json.dumps({'task_id': f'task-{len(submitted)}'}).encode()
+        elif kwargs.get('absolute'):
+            result._content = Path(raw_media[len(submitted) - 1]).read_bytes()
+        else:
+            identifier = f'task-{len(submitted)}'
+            assert path == f'/v2/query/video_generation/{identifier}'
+            job = server.all_jobs()[0]
+            assert job['shots'][len(submitted) - 1]['prompt_id'] == identifier
+            result._content = json.dumps({'task': {'id': identifier, 'status': 'succeeded',
+                'modality': 'video', 'task_type': 'generation',
+                'content': {'url': 'https://cdn.hailuoai.com/output.mp4'}}}).encode()
+        return result
+
+    def comfy_should_not_run(*args, **kwargs):
+        raise AssertionError('API mode must not load or contact ComfyUI')
+
+    monkeypatch.delenv('VIDEO_ENGINE')
+    monkeypatch.setenv('DIRECTOR_WORKFLOW_CONFIG', '/missing-template.json')
+    monkeypatch.setattr(client, '_request', fake_request)
+    monkeypatch.setattr(server.H3Api, 'from_env', lambda: client)
+    monkeypatch.setattr(server.ComfyUI, 'from_env', comfy_should_not_run)
+    monkeypatch.setattr(server, 'build_ref2va', comfy_should_not_run)
+    monkeypatch.setattr(server, 'output_prefix', comfy_should_not_run)
+    original = server.release
+
+    def release():
+        original()
+        finished.set()
+
+    monkeypatch.setattr(server, 'release', release)
+    files = {'image': ('product.png', picture(), 'image/png')}
+    if persona:
+        files['persona'] = ('person.png', picture(), 'image/png')
+    result = api.post('/api/start', data={'sentence': '蓝色便携水杯', 'orientation': orientation,
+                                        'persona_authorized': 'true' if persona else ''}, files=files)
+    assert result.status_code == 202
     assert finished.wait(45)
-    job=server.read_job(r.json()['job_id'])
-    assert job['stage']=='done' and job['engine']=='h3api' and len(submitted)==2
-    # 默认（不配置）仍走 ComfyUI——现有全部测试即覆盖此路径
+    job = server.read_job(result.json()['job_id'])
+    assert job['stage'] == 'done', job.get('diagnostic')
+    assert job['engine'] == 'h3api' and len(submitted) == 2
+    assert render.frame_count(job['final_path']) == 240
+    assert all(payload['ratio'] == ('9:16' if orientation == 'vertical' else '16:9') for payload in submitted)
+    assert all(payload['model'] == model and payload['duration'] == 5 for payload in submitted)
+    assert len(submitted[0]['content']) == (3 if persona else 2)
+    assert [item['role'] for item in submitted[1]['content'][1:]] == ['reference_image', 'reference_video']
+    assert api.get(f'/api/jobs/{job["job_id"]}/video').status_code == 200
 
 
 def test_remote_execution_error_is_retryable_not_attention(api, monkeypatch):

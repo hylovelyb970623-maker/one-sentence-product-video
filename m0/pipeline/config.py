@@ -4,6 +4,15 @@ from pathlib import Path
 import re
 
 
+def video_engine():
+    selected = os.environ.get('VIDEO_ENGINE', 'h3api').strip().lower()
+    if selected in {'h3api', 'h3_api', 'api', 'minimax'}:
+        return 'h3api'
+    if selected == 'comfyui':
+        return selected
+    raise ValueError('VIDEO_ENGINE must be h3api or comfyui')
+
+
 def load_env():
     configured = os.environ.get('DIRECTOR_ENV_FILE')
     if configured == '':
